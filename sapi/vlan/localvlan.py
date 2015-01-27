@@ -50,7 +50,10 @@ def get_topo():
     topology = current_app._get_current_object().topology
 
     for host in topo_db:
-        tunneling_ip = json.loads(topo_db[host])["tunneling_ip"]
+        try:
+            tunneling_ip = json.loads(topo_db[host])["tor_ip"]
+        except KeyError:
+            continue
         if tunneling_ip not in topology:
             topology[tunneling_ip] = {}
         topology[tunneling_ip]['hosts'] = []
