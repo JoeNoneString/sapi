@@ -30,7 +30,7 @@ utils.register_api(app, neutron.SyncApi,   'sync_api',   '/sync/')
 def auth_required():
     auth = request.authorization
     if not auth:
-        return "HTTP Basic Auth required.", 403
+        return "HTTP Basic Auth required.", 401
     app.logger.warning("\'%s\' %s - %s <%s:%s>" %(
             request.method,
             request.url,
