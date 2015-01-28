@@ -28,6 +28,25 @@ class NetworkBase(object):
             db_neutron.delete_nets(older_net['tenant_id'],
                                    older_net['network_id'])
 
+    @utils.traceback_enable
+    def _make_db_net_dict(self, net):
+        try:
+            network_id = net['id']
+            tenant_id = net['tenant_id']
+            segmentation_id = net['provider:segmentation_id']
+            segmentation_type = net['provider:network_type']
+            admin_state_up = 1 if net['admin_state_up'] else 0
+            shared = 1 if net['shared'] else 0
+        except KeyError:
+            raise ValueError("Received wrong Ml2 driver network data")
+
+        return {'network_id': network_id,
+                'tenant_id': tenant_id,
+                'segmentation_id': segmentation_id,
+                'segmentation_type': segmentation_type,
+                'admin_state_up': admin_state_up,
+                'shared': shared}
+
 class PortBase(object):
     @utils.traceback_enable
     def _make_db_port_dict(self, port):
@@ -59,65 +78,54 @@ class PortBase(object):
                 'ip_address': ip_address,
                 'mac_address': port['mac_address']}
 
+class SubnetBase(object):
+    @utils.traceback_enable
+    def _make_db_subnet_dict(self, subnet):
+        try:
+            subnet_id = subnet['id']
+            network_id = subnet['network_id']
+            tenant_id = subnet['tenant_id']
+            shared = 1 if subnet['shared'] else 0
+            enable_dhcp = 1 if subnet['enable_dhcp'] else 0
+        except KeyError:
+            raise ValueError("Received wrong Ml2 driver subnet data")
+
+        return {'subnet_id': subnet_id,
+                'network_id': network_id,
+                'tenant_id': tenant_id,
+                'shared': shared,
+                'enable_dhcp': enable_dhcp}
+
 class SyncApi(MethodView, HttpStatusCode,
-              NetworkBase, PortBase):
+              NetworkBase, PortBase, SubnetBase):
     def post(self):
         try:
             sync_info = request.get_json()['sina_openstack']
 
+            #Sync info from the ml2 driver, always clear the database.
             db_neutron.clear_database()
 
             self._sync_network(sync_info['network'])
             self._sync_subnet(sync_info['subnet'])
             self._sync_port(sync_info['port'])
         except:
-            print traceback.format_exc()
             return self.return_jsonify(400)
         return self.return_jsonify(200)
 
     def _sync_network(self, nets):
-        for net in nets:
-            admin_state_up = 1 if net['admin_state_up'] else 0
-            self._check_if_older_net(net)
-
-            #if not db_neutron.is_provisioned_nets(net['tenant_id'],
-            #                                      net['id']):
+        for _net in nets:
             db_neutron.persistence_nets(
-                        net['tenant_id'],
-                        net['id'],
-                        net['provider:segmentation_id'],
-                        net['provider:network_type'],
-                        admin_status_up=admin_state_up)
+                    self._make_db_net_dict(_net))
 
     def _sync_subnet(self, subnets):
-        for subnet in subnets:
-            enable_dhcp = 1 if subnet['enable_dhcp'] else 0
-            shared = 1 if subnet['shared'] else 0
-
-            #if db_neutron.is_provisioned_subnets(subnet['tenant_id'],
-            #                                     subnet['id']):
-            #    db_neutron.update_subnets(subnet['tenant_id'],
-            #                              subnet['id'],
-            #                              shared,
-            #                              enable_dhcp)
-            #else:
+        for _subnet in subnets:
             db_neutron.persistence_subnets(
-                        subnet['id'],
-                        subnet['network_id'],
-                        subnet['tenant_id'],
-                        shared,
-                        enable_dhcp)
+                    self._make_db_subnet_dict(_subnet))
 
     def _sync_port(self, ports):
         for _port in ports:
-            port = self._make_db_port_dict(_port)
-            #if db_neutron.is_provisioned_ports(port['tenant_id'],
-            #                                   port['port_id']):
-            #    db_neutron.update_ports(port['tenant_id'],
-            #                            port['port_id'],
-            #                            port)
-            #else:
-            db_neutron.persistence_ports(port)
+            db_neutron.persistence_ports(
+                    self._make_db_port_dict(_port))
 
 class NetApi(MethodView, HttpStatusCode, NetworkBase):
     RESOURCE_KEY="network id"
@@ -127,7 +135,6 @@ class NetApi(MethodView, HttpStatusCode, NetworkBase):
             return self.return_jsonify(400)
 
         net = db_neutron.get_network(net_id)
-        #net = db_neutron.retrieve_ports()
         if not net:
             return self.return_jsonify(404)
         return jsonify(network=net)
@@ -138,9 +145,7 @@ class NetApi(MethodView, HttpStatusCode, NetworkBase):
         except KeyError:
             return self.return_jsonify(400)
 
-        self._check_if_older_net(network)
-        self._persistence_nets(network)
-
+        self._persistence_nets(self._make_db_net_dict(network))
         return self.return_jsonify(200)
 
     def put(self, net_id):
@@ -153,10 +158,7 @@ class NetApi(MethodView, HttpStatusCode, NetworkBase):
         except KeyError:
             return self.return_jsonify(400)
 
-        self._update_nets(network['tenant_id'],
-                          network['id'],
-                          1 if network['admin_state_up'] else 0)
-
+        self._update_nets(self._make_db_net_dict(network))
         return self.return_jsonify(200)
 
     def delete(self, net_id):
@@ -166,27 +168,23 @@ class NetApi(MethodView, HttpStatusCode, NetworkBase):
 
         self._delete_nets(net['tenant_id'],
                           net['network_id'])
-
         return self.return_jsonify(200)
 
     @utils.traceback_enable
     def _persistence_nets(self, network):
-        db_neutron.persistence_nets(
-                network['tenant_id'],
-                network['id'],
-                network['provider:segmentation_id'],
-                network['provider:network_type'],
-                admin_status_up = 1 if network['admin_state_up'] else 0)
+        db_neutron.persistence_nets(network)
 
     @utils.traceback_enable
     def _delete_nets(self, tenant_id, network_id):
         db_neutron.delete_nets(tenant_id, network_id)
 
     @utils.traceback_enable
-    def _update_nets(self, tenant_id, network_id, admin_state_up):
-        db_neutron.update_nets(tenant_id, network_id, admin_state_up)
+    def _update_nets(self, network):
+        db_neutron.update_nets(network['tenant_id'],
+                               network['network_id'],
+                               network)
 
-class SubnetApi(MethodView, HttpStatusCode):
+class SubnetApi(MethodView, HttpStatusCode, SubnetBase):
     RESOURCE_KEY = "subnet id"
 
     def get(self, subnet_id):
@@ -205,7 +203,7 @@ class SubnetApi(MethodView, HttpStatusCode):
         except KeyError:
             return self.return_jsonify(400)
 
-        self._persistence_subnets(subnet)
+        self._persistence_subnets(self._make_db_subnet_dict(subnet))
 
         return self.return_jsonify(200)
 
@@ -219,7 +217,7 @@ class SubnetApi(MethodView, HttpStatusCode):
         except KeyError:
             return self.return_jsonify(400)
 
-        self._update_subnets(subnet)
+        self._update_subnets(self._make_db_subnet_dict(subnet))
 
         return self.return_jsonify(200)
 
@@ -238,26 +236,17 @@ class SubnetApi(MethodView, HttpStatusCode):
 
     @utils.traceback_enable
     def _persistence_subnets(self, subnet):
-        db_neutron.persistence_subnets(
-                    subnet['id'],
-                    subnet['network_id'],
-                    subnet['tenant_id'],
-                    1 if subnet['shared'] else 0,
-                    1 if subnet['enable_dhcp'] else 0)
+        db_neutron.persistence_subnets(subnet)
 
     @utils.traceback_enable
     def _delete_subnets(self, subnet):
-        db_neutron.delete_subnets(
-                    subnet['tenant_id'],
-                    subnet['subnet_id'])
+        db_neutron.delete_subnets(subnet['tenant_id'], subnet['subnet_id'])
 
     @utils.traceback_enable
     def _update_subnets(self, subnet):
-        db_neutron.update_subnets(
-                    subnet['tenant_id'],
-                    subnet['id'],
-                    1 if subnet['shared'] else 0,
-                    1 if subnet['enable_dhcp'] else 0)
+        db_neutron.update_subnets(subnet['tenant_id'],
+                                  subnet['subnet_id'],
+                                  subnet)
 
 class PortApi(MethodView, HttpStatusCode, PortBase):
     RESOURCE_KEY = "port id"

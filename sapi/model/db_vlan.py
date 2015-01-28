@@ -15,6 +15,9 @@ CONF = cfg.CONF
 UUID_LEN = db_constants.UUID_LEN
 IP_ADDRESS = db_constants.IP_ADDRESS_LENGTH
 UNUSED = db_constants.VLAN_UNSET
+VLAN_MIN = db_constants.VLAN_MIN
+VLAN_SHARED = db_constants.VLAN_SHARED
+VLAN_MAX = db_constants.VLAN_MAX
 
 class SapiVlanAllocations(model_base.BASEV2, models_v2.HasId):
     __tablename__ = "sapi_vlan_allocations"
@@ -23,12 +26,14 @@ class SapiVlanAllocations(model_base.BASEV2, models_v2.HasId):
     tor_ip = sa.Column(sa.String(IP_ADDRESS))
     vlan_id = sa.Column(sa.INTEGER)
     allocated = sa.Column(sa.INTEGER)
+    shared = sa.Column(sa.INTEGER)
 
     def sapi_vlan_representation(self):
         return {'network_id': self.network_id,
                 'tor_ip': self.tor_ip,
                 'vlan_id': self.vlan_id,
-                'allocated': self.allocated}
+                'allocated': self.allocated,
+                'shared': self.shared}
 
 class SapiPortVlanMapping(model_base.BASEV2):
     __tablename__ = "sapi_port_vlan_mapping"
@@ -99,7 +104,8 @@ def add_vlan(tor_ip, vlan_id, allocated=0):
         vlan = SapiVlanAllocations(
                 tor_ip = tor_ip,
                 vlan_id = vlan_id,
-                allocated = allocated)
+                allocated = allocated,
+                shared = 1 if vlan_id >= VLAN_SHARED else 0)
         session.add(vlan)
 
 def set_vlan_allocated(network_id, tor_ip, vlan_id):
@@ -118,12 +124,13 @@ def unset_vlan_allocated(tor_ip, vlan_id):
                    vlan_id = vlan_id).update({'allocated':0,
                                               'network_id':UNUSED}))
 
-def get_vlan_map(tor_ip):
+def get_vlan_map(tor_ip, shared=0):
     session = db.get_session()
     with session.begin():
         model = SapiVlanAllocations
         vlans = (session.query(model).
-                   filter(model.tor_ip == tor_ip))
+                   filter(model.tor_ip == tor_ip,
+                          model.shared == shared))
 
         res = dict((vlan.id, vlan.sapi_vlan_representation())
                 for vlan in vlans)
@@ -135,8 +142,9 @@ def is_tor_exists(tor_ip):
     with session.begin():
         num = (session.query(SapiVlanAllocations).
                filter_by(tor_ip = tor_ip).count())
-
-        return num > 0
+        if num > 0 and num < VLAN_MAX-1:
+            return -1
+        return num == (VLAN_MAX - 1)
 
 def get_vlan_allocation(network_id, tor_ip):
     session = db.get_session()

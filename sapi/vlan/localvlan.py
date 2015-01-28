@@ -29,8 +29,12 @@ def select_tor_from_topo(topology, host):
 def init_vlan_bitmap(topology, tor_ip):
     topology[tor_ip]['vlanbitmap'] = \
         utils.LocalVLanBitmap(db_constants.VLAN_MIN,
-                              db_constants.VLAN_MAX)
+                              db_constants.VLAN_SHARED - 1)
+    topology[tor_ip]['vlanbitmap_shared'] = \
+        utils.LocalVLanBitmap(db_constants.VLAN_SHARED,
+                              db_constants.VLAN_MAX - 1)
     bitmap = topology[tor_ip]['vlanbitmap']
+    shared_bitmap = topology[tor_ip]['vlanbitmap_shared']
     db_vlan_map = db_vlan.get_vlan_map(tor_ip)
     for id in db_vlan_map:
         allocated = db_vlan_map[id]['allocated']
@@ -38,9 +42,16 @@ def init_vlan_bitmap(topology, tor_ip):
         if allocated:
             bitmap.add_bits(vlan_id)
 
-def init_vlan_db(netid, tor_ip):
+    db_vlan_map_shared = db_vlan.get_vlan_map(tor_ip, shared=1)
+    for id in db_vlan_map_shared:
+        allocated = db_vlan_map_shared[id]['allocated']
+        vlan_id = db_vlan_map_shared[id]['vlan_id']
+        if allocated:
+            shared_bitmap.add_bits(vlan_id)
+
+def init_vlan_db(tor_ip):
     for vlan_id in range(
-            db_constants.VLAN_MIN, db_constants.VLAN_MAX + 1):
+            db_constants.VLAN_MIN, db_constants.VLAN_MAX):
         db_vlan.add_vlan(tor_ip, vlan_id)
 
 @vlan.before_request
@@ -58,6 +69,8 @@ def get_topo():
             topology[tunneling_ip] = {}
         topology[tunneling_ip]['hosts'] = []
         topology[tunneling_ip]['hosts'].append(host)
+        if not db_vlan.is_tor_exists(tunneling_ip):
+            init_vlan_db(tunneling_ip)
 
 @vlan.route("/", methods = ['POST'])
 @vlan.route("/<string:portid>", methods = ['DELETE'])
@@ -75,8 +88,12 @@ def topology(portid=None):
             vlan_id = pv_map['vlan_id']
             db_vlan.delete_port_vlan_mapping(portid)
             nums = db_vlan.tor_port_vlan_entries(netid, tor_ip)
+            shared = db_neutron.is_shared_net(netid)
             if nums == 0:
-                topology[tor_ip]['vlanbitmap'].delete_bits(vlan_id)
+                if not shared:
+                    topology[tor_ip]['vlanbitmap'].delete_bits(vlan_id)
+                else:
+                    topology[tor_ip]['vlanbitmap_shared'].delete_bits(vlan_id)
                 db_vlan.unset_vlan_allocated(tor_ip, vlan_id)
         return '', 200
 
@@ -91,11 +108,14 @@ def topology(portid=None):
     if not tor_ip:
         return jsonify(vlanmapping=map, message="Host not in topology"), 404
 
-    if not db_vlan.is_tor_exists(tor_ip):
-        init_vlan_db(netid, tor_ip)
+    if not db_neutron.get_network(netid):
+        return jsonify(vlanmapping=map, message="Network id not founded"), 404
 
-    #if 'vlanmap' not in topology[tor_ip]:
-    #    topology[tor_ip]['vlanmap'] = {}
+    #if not db_neutron.get_port(portid):
+    #    return jsonify(vlanmapping=map, message="Port id not founded"), 404
+
+    #if not db_vlan.is_tor_exists(tor_ip):
+    #    init_vlan_db(netid, tor_ip)
 
     with lock:
         if 'vlanbitmap' not in topology[tor_ip]:
@@ -103,12 +123,15 @@ def topology(portid=None):
 
         #torvlanmap = topology[tor_ip]['vlanmap']
         vlanbitmap = topology[tor_ip]['vlanbitmap']
+        shared_vlanbitmap = topology[tor_ip]['vlanbitmap_shared']
 
         vm = db_vlan.get_vlan_allocation(netid, tor_ip)
         if vm:
             vlan_id = vm["vlan_id"]
         else:
-            vlan_id = vlanbitmap.get_unused_bits()
+            shared = db_neutron.is_shared_net(netid)
+            vlan_id = shared_vlanbitmap.get_unused_bits() \
+                    if shared else vlanbitmap.get_unused_bits()
             if not vlan_id:
                 message = "vlan id out of range %d" %(db_constants.VLAN_MAX)
                 return jsonify(vlanmapping=map, message=message), 400

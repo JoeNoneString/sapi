@@ -16,27 +16,28 @@ CONF = cfg.CONF
 UUID_LEN = db_constants.UUID_LEN
 OVS_TYPE = db_constants.OVS_TYPE
 
-class SapiProvisionedNets(model_base.BASEV2, models_v2.HasId,
-                          models_v2.HasTenant):
+class SapiProvisionedNets(model_base.BASEV2, models_v2.HasTenant):
     __tablename__ = "sapi_provisioned_nets"
 
-    network_id = sa.Column(sa.String(UUID_LEN))
+    network_id = sa.Column(sa.String(UUID_LEN), primary_key = True)
     segmentation_id = sa.Column(sa.Integer)
     segmentation_type = sa.Column(sa.String(UUID_LEN))
-    admin_status_up = sa.Column(sa.Integer)
+    admin_state_up = sa.Column(sa.Integer)
+    shared = sa.Column(sa.Integer)
 
     def sapi_net_representation(self):
         return {'network_id': self.network_id,
+                'tenant_id': self.tenant_id,
                 'segmentation_id': self.segmentation_id,
                 'segmentation_type': self.segmentation_type,
-                'admin_status_up': self.admin_status_up,
-                'tenant_id': self.tenant_id}
+                'admin_state_up': self.admin_state_up,
+                'shared': self.shared}
 
 class SapiProvisionedSubnets(model_base.BASEV2, models_v2.HasTenant):
     __tablename__ = "sapi_provisioned_subnets"
 
-    enable_dhcp = sa.Column(sa.Integer)
     subnet_id = sa.Column(sa.String(UUID_LEN), primary_key=True)
+    enable_dhcp = sa.Column(sa.Integer)
     network_id = sa.Column(sa.String(UUID_LEN))
     shared = sa.Column(sa.Integer)
 
@@ -91,29 +92,27 @@ def persistence_ports(port):
                 mac_address = port['mac_address'])
         session.add(port)
 
-def persistence_nets(tenant_id, network_id,
-                     segmentation_id, segmentation_type,
-                     admin_status_up=1):
+def persistence_nets(net):
     session = db.get_session()
     with session.begin():
         net = SapiProvisionedNets(
-                tenant_id = tenant_id,
-                network_id = network_id,
-                segmentation_id = segmentation_id,
-                segmentation_type = segmentation_type,
-                admin_status_up = admin_status_up)
+                tenant_id = net['tenant_id'],
+                network_id = net['network_id'],
+                segmentation_id = net['segmentation_id'],
+                segmentation_type = net['segmentation_type'],
+                admin_state_up = net['admin_state_up'],
+                shared = net['shared'])
         session.add(net)
 
-def persistence_subnets(subnet_id, network_id,
-                        tenant_id, shared, enable_dhcp):
+def persistence_subnets(subnet):
     session = db.get_session()
     with session.begin():
         subnet = SapiProvisionedSubnets(
-                tenant_id = tenant_id,
-                network_id = network_id,
-                subnet_id = subnet_id,
-                enable_dhcp = enable_dhcp,
-                shared = shared)
+                tenant_id = subnet['tenant_id'],
+                network_id = subnet['network_id'],
+                subnet_id = subnet['subnet_id'],
+                enable_dhcp = subnet['enable_dhcp'],
+                shared = subnet['shared'])
         session.add(subnet)
 
 def retrieve_subnets():
@@ -210,28 +209,27 @@ def delete_ports(tenant_id, port_id):
          filter_by(tenant_id=tenant_id, port_id=port_id).
          delete())
 
-def update_subnets(tenant_id, subnet_id, shared, enable_dhcp):
+def update_subnets(tenant_id, subnet_id, subnet):
     session = db.get_session()
     with session.begin():
         try:
             (session.query(SapiProvisionedSubnets).
              filter_by(tenant_id = tenant_id,
                        subnet_id = subnet_id).
-                            update({'shared': shared,
-                                    'enable_dhcp': enable_dhcp}))
+                            update(subnet))
         except exc.NoResultFound:
             raise db_exception.DBnotfounded()
         except exc.MultipleResultsFound:
             raise db_exception.Multipledbfounded()
 
-def update_nets(tenant_id, network_id, admin_state_up):
+def update_nets(tenant_id, network_id, net):
     session = db.get_session()
     with session.begin():
         try:
             (session.query(SapiProvisionedNets).
              filter_by(tenant_id = tenant_id,
                        network_id = network_id).
-                            update({'admin_status_up':admin_state_up}))
+                            update(net))
         except exc.NoResultFound:
             raise db_exception.DBnotfounded()
         except exc.MultipleResultsFound:
@@ -291,6 +289,17 @@ def is_older_nets(tenant_id, segmentation_id, segmentation_type):
         except:
             return None
     return net.sapi_net_representation()
+
+def is_shared_net(network_id):
+    session = db.get_session()
+    with session.begin():
+        try:
+            net = (session.query(SapiProvisionedNets).
+                   filter_by(network_id = network_id).one())
+        except exc.NoResultFound:
+            return False
+
+        return net.shared
 
 def retrieve_db_topology():
     session = db.get_session()
