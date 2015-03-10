@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # encoding: utf-8
-import traceback
-
 from flask import request
-from flask import jsonify
+from flask import jsonify, url_for
 from flask.views import MethodView
-from sapi.model import db_neutron
+from sapi.model import db_neutron_v2 as db_neutron
 from sapi import utils
 
 class HttpStatusCode(object):
@@ -20,14 +18,6 @@ class HttpStatusCode(object):
         return jsonify(message=self._status[code]), code
 
 class NetworkBase(object):
-    def _check_if_older_net(self, net):
-        older_net = db_neutron.is_older_nets(net['tenant_id'],
-                                             net['provider:segmentation_id'],
-                                             net['provider:network_type'])
-        if older_net:
-            db_neutron.delete_nets(older_net['tenant_id'],
-                                   older_net['network_id'])
-
     @utils.traceback_enable
     def _make_db_net_dict(self, net):
         try:
@@ -133,6 +123,7 @@ class NetApi(MethodView, HttpStatusCode, NetworkBase):
     def get(self, net_id):
         if not net_id:
             return self.return_jsonify(400)
+
 
         net = db_neutron.get_network(net_id)
         if not net:

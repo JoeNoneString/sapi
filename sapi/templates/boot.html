@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title> Tor Tunnels Configuretion</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- Bootstarp -->
+        <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" type="text/css" rel="stylesheet" media="screen"></link>
+    </head>
+    <body>
+        <div class='table'>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Tor IP</th>
+                        <th>Tor Tunnel IP</th>
+                        <th>Tor Downlinks</th>
+                        <th>Tor Tunnels</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tor in tors %}
+                        <tr>
+                            <td>{{tor.tor_ip}}</td>
+                            <td>{{tor.tunnel_src_ip}}</td>
+                            <td>{{tor.downlinks}}</td>
+                            <td>{{tor.tunnels}}</td>
+                            <td>
+                                <form action="{{url_for('register.tor_info')}}" method='post' class='form-horizontal'>
+                                    <button type="submit" class="btn btn-default" value='{{tor.tor_ip}}', name='torIp'>下线</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <script src="http://code.jquery.com/jquery.js"></script>
+        <script src="{{url_for('static', filename='js/bootstrap.min.js')}}" type="text/javascript"></script>
+    </body>
+</html>

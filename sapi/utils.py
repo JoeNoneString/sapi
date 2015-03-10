@@ -3,9 +3,24 @@
 
 import traceback
 import logging
+import socket
 from flask import Response
 
 LOG = None
+
+def is_valid_ipv4_address(address):
+    try:
+        socket.inet_pton(socket.AF_INET, address)
+    except AttributeError:  # no inet_pton here, sorry
+        try:
+            socket.inet_aton(address)
+        except socket.error:
+            return False
+        return address.count('.') == 3
+    except socket.error:  # not a valid address
+        return False
+
+    return True
 
 def register_api(app, view, endpoint, url, pk='id', pk_type='int'):
     view_func = view.as_view(endpoint)
@@ -14,13 +29,14 @@ def register_api(app, view, endpoint, url, pk='id', pk_type='int'):
     app.add_url_rule(url, view_func=view_func, methods=['POST',])
     app.add_url_rule('%s<%s:%s>' % (url, pk_type, pk), view_func=view_func,
                      methods=['GET', 'PUT', 'DELETE'])
+
 def init_logger(app):
     global LOG
     #formatter = logging.Formatter('[%(asctime)s] - %(name)s - %(levelname)s - %(message)s')
     formatter = logging.Formatter("[%(asctime)s] -%(name)s- %(levelname)s : %(message)s",
                                           "%Y-%m-%d %H:%M:%S")
     floger = logging.FileHandler('log/sapi.log')
-    floger.setLevel(logging.INFO)
+    floger.setLevel(logging.NOTSET)
     floger.setFormatter(formatter)
     app.logger.addHandler(floger)
     LOG = app.logger
