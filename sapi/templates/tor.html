@@ -5,6 +5,16 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <!-- Bootstarp -->
         <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" type="text/css" rel="stylesheet" media="screen"></link>
+        <style type="text/css">
+            body {
+                background-color: white;
+                margin-left: 20%;
+                margin-right: 20%;
+                border: 1px dotted gray;
+                padding: 10px 10px 10px 10px;
+                font-family: sans-serif;
+            }
+        </style>
     </head>
     <body>
         <form action="{{url_for('register.register_tor')}}" method='post' class='form-horizontal'>

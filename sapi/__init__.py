@@ -53,7 +53,8 @@ def get_topo():
         if tunneling_ip not in topology:
             topology[tunneling_ip] = {}
             topology[tunneling_ip]['hosts'] = []
-        topology[tunneling_ip]['hosts'].append(host)
+        if host not in topology[tunneling_ip]['hosts']:
+            topology[tunneling_ip]['hosts'].append(host)
 
         db_status = db_vlan.is_tor_exists(tunneling_ip)
         if db_status == -1:

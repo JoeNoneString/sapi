@@ -323,7 +323,8 @@ def is_shared_net(network_id):
         return False
 
 def retrieve_db_topology():
-    all_ovs = Agent.query.all()
+    all_ovs = Agent.query.filter_by(
+            agent_type = OVS_TYPE)
     return dict(
         (ovs.host, ovs.configurations)
         for ovs in all_ovs)

@@ -25,7 +25,7 @@ def interface_info(_connect_tor):
             interface = [(replace_ifindex(lines[2*i]), replace_name(lines[2*i+1])) \
                     for i in range(len(lines)/2)]
         except:
-            print traceback.format_exc()
+            pass
         return interface
 
 def special_interface_info(_connect_tor, if_index):

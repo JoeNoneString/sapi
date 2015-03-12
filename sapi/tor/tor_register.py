@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+import traceback
 
 from flask import Blueprint, request, render_template, redirect, url_for
 from flask import current_app
@@ -20,6 +21,23 @@ def validate(src, dst):
     if not utils.is_valid_ipv4_address(dst):
         return "Invalid ipv4 address for tor tunnel ip \' %s \'" %(dst)
 
+@register.route("/interface", methods=['GET', 'POST'])
+def interface():
+    conn = current_app._get_current_object().conn
+    interfaces = None
+    error = None
+
+    if request.method == 'POST':
+        torIp = request.form['torIp']
+
+        try:
+            interfaces = h3c.interface_info(conn[torIp])
+        except KeyError:
+            error = "Can`t connect to Tor \'%s\'" %(torIp)
+        except:
+            error = "查询失败"
+
+    return render_template('interface.html', error=error, interfaces=interfaces)
 
 @register.route("/torinfo", methods=['GET', 'POST'])
 def tor_info():
@@ -77,15 +95,16 @@ def register_tor():
         if not error and db_tor.retrieve_tor(torIp):
             error = "Existed tor ip \'%s\' in database." %(torIp)
 
-        try:
-            connection = conn[torIp]
-        except:
+        if not error:
             try:
-                conn[torIp] = tor.ConnTor(torIp,
-                            app.config['USERNAME'],
-                            app.config['PASSWORD'])
+                connection = conn[torIp]
             except:
-                error = "Tor \'%s\' Connection Failed, Plz check it now !!!" %(torIp)
+                try:
+                    conn[torIp] = tor.ConnTor(torIp,
+                                app.config['USERNAME'],
+                                app.config['PASSWORD'])
+                except:
+                    error = "Tor \'%s\' Connection Failed, Plz check it now !!!" %(torIp)
 
         if not error:
             app.logger.warning('Tunnel Sync : register new tor \'%s\', tunnel_src_ip \'%s\', downlinks \'%s\'' %(

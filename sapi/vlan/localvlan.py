@@ -77,7 +77,8 @@ def get_topo():
         if tunneling_ip not in topology:
             topology[tunneling_ip] = {}
             topology[tunneling_ip]['hosts'] = []
-        topology[tunneling_ip]['hosts'].append(host)
+        if host not in topology[tunneling_ip]['hosts']:
+            topology[tunneling_ip]['hosts'].append(host)
         if not db_vlan.is_tor_exists(tunneling_ip):
             init_vlan_db(tunneling_ip)
 
@@ -153,7 +154,7 @@ def topology(portid=None):
     tor_ip = select_tor_from_topo(topology, host)
     if not tor_ip:
         app.logger.warning('Host \'%s\' not in topology, POST data: tor \'%s\' network id \'%s\' port id \'%s\'' %(
-            tor_ip, netid, portid))
+            host, tor_ip, netid, portid))
         return jsonify(vlanmapping=map, message="Host not in topology"), 404
 
     if not db_neutron.get_network(netid):
