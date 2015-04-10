@@ -8,13 +8,14 @@ class BasicConfig(object):
     HOST='localhost'
 
 class ProductionConfig(BasicConfig):
-    DEBUG = True
+    DEBUG = False
     PORT = 8080
     HOST='0.0.0.0'
     SSH_TIMEOUT = 20
     USERNAME = 'sinanp'
     PASSWORD = 'sinanp'
     SQLALCHEMY_DATABASE_URI = 'mysql://neutron:neutron@10.216.25.57/neutron'
+    TOR_RETRY_TIMES = 3
 
 class TestConfig(BasicConfig):
     PORT = 1919

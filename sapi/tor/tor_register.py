@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # encoding: utf-8
-import traceback
 
 from flask import Blueprint, request, render_template, redirect, url_for
 from flask import current_app

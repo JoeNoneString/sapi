@@ -11,7 +11,7 @@ LOG = None
 def is_valid_ipv4_address(address):
     try:
         socket.inet_pton(socket.AF_INET, address)
-    except AttributeError:  # no inet_pton here, sorry
+    except AttributeError:  # no inet_pton here
         try:
             socket.inet_aton(address)
         except socket.error:

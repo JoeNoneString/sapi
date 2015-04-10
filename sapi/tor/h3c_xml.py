@@ -21,7 +21,7 @@ DELETE_AC = """
 <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
  xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
     <top xmlns="http://www.h3c.com/netconf/config:1.0">
-        <L2VPN xc:operation="delete">
+        <L2VPN xc:operation="remove">
             <ACs>
                 <AC>
                     <IfIndex>{if_index}</IfIndex>
@@ -55,7 +55,7 @@ DELETE_SERVICE = """
 <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
  xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
     <top xmlns="http://www.h3c.com/netconf/config:1.0">
-        <L2VPN xc:operation="delete">
+        <L2VPN xc:operation="remove">
             <SRVs>
                 <SRV>
                     <IfIndex>{if_index}</IfIndex>
@@ -119,7 +119,7 @@ DELETE_VXLAN = """
     <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
      xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
       <top xmlns="http://www.h3c.com/netconf/config:1.0">
-        <VXLAN xc:operation="delete">
+        <VXLAN xc:operation="remove">
           <VXLANs>
               <Vxlan>
                   <VxlanID>{vxlanid}</VxlanID>
@@ -154,7 +154,7 @@ DELETE_TUNNEL = """
     <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
      xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
       <top xmlns="http://www.h3c.com/netconf/config:1.0">
-        <TUNNEL xc:operation="delete">
+        <TUNNEL xc:operation="remove">
           <Tunnels>
               <Tunnel>
                   <ID>{tunnel_id}</ID>
@@ -176,9 +176,10 @@ RETRIEVE_AVAILABLE_TUNNEL_ID = """
 
 
 EDIT_VXLAN_TUNNEL = """
-    <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+     xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
       <top xmlns="http://www.h3c.com/netconf/config:1.0">
-        <VXLAN>
+        <VXLAN xc:operation="merge">
           <Tunnels>
               <Tunnel>
                   <VxlanID>{vxlanid}</VxlanID>

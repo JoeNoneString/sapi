@@ -106,7 +106,7 @@ class VSI(Base):
 
     @property
     def __delete_xml(self):
-        return VSI_OPERATION.format(operation="delete", vsiname=self._name)
+        return VSI_OPERATION.format(operation="remove", vsiname=self._name)
 
     @property
     def __create_xml(self):
